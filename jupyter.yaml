@@ -1,0 +1,71 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jupyter-config
+data:
+  jupyter_notebook_config.json: |
+    {
+      "NotebookApp": {
+        "password": "sha1:0b2b24cf6638:afe4cb4babfc848514dcc009b3dbbea00d44dda4"
+      }
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jupyter-1
+  labels:
+    app: jupyter-1
+spec:
+  ports:
+  - port: 80
+    name: http
+    targetPort: 8888
+    nodePort: 31001
+  selector:
+    app: jupyter-1
+  type: NodePort
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jupyter-1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jupyter-1
+  template:
+    metadata:
+      labels:
+        app: jupyter-1
+    spec:
+      containers:
+      - name: jupyter-1
+        image: seungkyua/jupyter:latest
+        command:
+        - /usr/bin/tini
+        - --
+        - jupyter
+        - notebook
+        - --allow-root
+        - --ip
+        - 0.0.0.0
+        ports:
+        - containerPort: 8888
+          protocol: TCP
+          name: http
+        volumeMounts:
+        - mountPath: /repo
+          name: notebook-volume
+        - mountPath: /root/.jupyter/jupyter_notebook_config.json
+          name: jupyter-password
+          subPath: jupyter_notebook_config.json
+      volumes:
+      - name: notebook-volume
+        gitRepo:
+          repository: "https://github.com/kubernetes-client/python.git"
+      - name: jupyter-password
+        configMap:
+          name: jupyter-config
+
